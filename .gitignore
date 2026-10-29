@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.next/
+out/
+*.tsbuildinfo
+.env*
+!.env.example
+.vercel/
+chat-verificado.png
+n8n/agente-publicado.png
+n8n/evaluations/
