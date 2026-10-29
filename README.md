@@ -2,6 +2,8 @@
 
 Frontend de chat con Next.js App Router, React y TypeScript estricto. Diseño responsive, historial local persistente, búsqueda, descarga de conversaciones y conexión directa a n8n.
 
+Sitio publicado: [alba-chat.vercel.app](https://alba-chat.vercel.app).
+
 ## Desarrollo
 
 Node.js 20.9 o superior.
