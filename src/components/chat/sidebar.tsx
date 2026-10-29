@@ -63,7 +63,6 @@ export function Sidebar({
       >
         <Icon name="plus" />
         <span>Nueva conversación</span>
-        <kbd>⌘ K</kbd>
       </button>
       <label className="search">
         <Icon name="search" />

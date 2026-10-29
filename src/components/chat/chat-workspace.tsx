@@ -116,6 +116,7 @@ export function ChatWorkspace() {
             </div>
           )}
           <Composer
+            compact={Boolean(chat.active?.messages.length)}
             value={draft}
             onChange={setDraft}
             disabled={!chat.ready || chat.isPending}

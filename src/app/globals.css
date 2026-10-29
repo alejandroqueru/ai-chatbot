@@ -827,9 +827,6 @@ footer > span:last-child {
   .disclaimer {
     font-size: 11px;
   }
-  .disclaimer span {
-    display: none;
-  }
   footer {
     margin: 0 20px;
     height: 38px;
@@ -929,4 +926,27 @@ textarea:focus-visible {
   .sidebar {
     width: min(280px, 85%);
   }
+}
+
+.composer-area--compact {
+  padding-bottom: 14px;
+}
+.composer-area--compact #composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 10px 12px 10px 17px;
+}
+.composer-area--compact textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 33px;
+  padding: 5px 0;
+}
+.composer-area--compact .composer-bottom {
+  flex-shrink: 0;
+  margin-top: 0;
+}
+.composer-area--compact .disclaimer {
+  margin-top: 10px;
 }

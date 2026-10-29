@@ -6,9 +6,16 @@ interface ComposerProps {
   onChange: (value: string) => void;
   onSend: () => void;
   disabled: boolean;
+  compact: boolean;
 }
 
-export function Composer({ value, onChange, onSend, disabled }: ComposerProps) {
+export function Composer({
+  value,
+  onChange,
+  onSend,
+  disabled,
+  compact,
+}: ComposerProps) {
   const input = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     if (!input.current) return;
@@ -17,7 +24,7 @@ export function Composer({ value, onChange, onSend, disabled }: ComposerProps) {
   }, [value]);
 
   return (
-    <div className="composer-area">
+    <div className={`composer-area${compact ? ' composer-area--compact' : ''}`}>
       <form
         id="composer"
         onSubmit={(e) => {
@@ -46,12 +53,14 @@ export function Composer({ value, onChange, onSend, disabled }: ComposerProps) {
           }}
         />
         <div className="composer-bottom">
-          <span className="composer-label">
-            <Icon name="spark" />
-            <span>Podemos hablarlo, paso a paso.</span>
-          </span>
+          {!compact && (
+            <span className="composer-label">
+              <Icon name="spark" />
+              <span>Podemos hablarlo, paso a paso.</span>
+            </span>
+          )}
           <div className="send-area">
-            <span className="enter-hint">Enter para enviar</span>
+            {!compact && <span className="enter-hint">Enter para enviar</span>}
             <button
               className="send"
               type="submit"
