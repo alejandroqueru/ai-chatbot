@@ -1,86 +1,34 @@
-# Alba · Next.js
+# Alba
 
-Frontend de chat con Next.js App Router, React y TypeScript estricto. Diseño responsive, historial local persistente, búsqueda, descarga de conversaciones y conexión directa a n8n.
+Alba es una aplicación web de chat que ofrece orientación y apoyo inicial a personas que enfrentan situaciones de acoso en el trabajo o en la escuela. Funciona como la cara visible de un asistente de IA: el usuario escribe en una interfaz sencilla y recibe respuestas generadas por un agente que consulta documentos de referencia, como material legal y protocolos.
 
-Sitio publicado: [alba-chat.vercel.app](https://alba-chat.vercel.app).
+## Cómo funciona
 
-## Desarrollo
+El proyecto tiene dos partes:
 
-Node.js 20.9 o superior.
+1. **Frontend (este repositorio).** Una aplicación hecha con Next.js, React y TypeScript. Muestra la conversación, guarda el historial en el navegador y envía cada mensaje al agente.
+2. **Agente en n8n.** Un workflow llamado *Harassment RAG Chatbot (Work & School)* que recibe el mensaje por un webhook, lo procesa con un modelo de Gemini, busca información relevante en una base de documentos (RAG) y devuelve la respuesta. Sus instrucciones se encuentran en `n8n/alba-system-message.md`.
 
-```sh
-npm ci
-npm run dev
-```
+No hay backend propio: el navegador se comunica directamente con el webhook de n8n.
 
-Abrir http://localhost:5173. Para producción: `npm run build` y `npm start`.
+## Qué ofrece
 
-## Desplegar en Vercel
-
-Importa este repositorio en Vercel con el preset **Next.js** y el directorio raíz del proyecto. No hace falta un backend adicional para este frontend.
-
-Configura `NEXT_PUBLIC_N8N_WEBHOOK_URL` en las variables del proyecto antes de desplegar, usando la URL de producción del workflow activo. El valor se incorpora al bundle del navegador durante la compilación; después de cambiarlo es necesario volver a desplegar. No subas `.env.local` al repositorio.
-
-El historial es local al navegador y al dominio. Las conversaciones guardadas en localhost no aparecen automáticamente en el dominio de Vercel. El webhook de n8n debe permitir solicitudes desde el dominio publicado.
+- Chat con interfaz responsive para móvil y escritorio.
+- Historial de conversaciones guardado localmente, con búsqueda y descarga en JSON.
+- Memoria por conversación mediante un identificador de sesión.
+- Cancelación de peticiones, tiempo límite y reintento de mensajes con error.
+- Un agente que prioriza la ayuda inmediata cuando detecta posible peligro y reconoce los límites de la información que tiene.
 
 ## Estructura
 
-- `src/app`: página, layout, metadata y estilos globales.
-- `src/components/chat`: interfaz dividida en sidebar, bienvenida, mensajes y editor.
-- `src/hooks/use-chat.ts`: estado con reducer, persistencia y ciclo de vida de peticiones.
-- `src/lib`: tipos, validación del historial y cliente n8n.
-- `public/landscape.png`: fondo servido por Next.js, copiado de `img/landscape.png`.
+- `src/app`: página, layout y estilos globales.
+- `src/components/chat`: componentes de la interfaz (barra lateral, bienvenida, mensajes y editor).
+- `src/hooks/use-chat.ts`: estado del chat, persistencia y ciclo de vida de las peticiones.
+- `src/lib`: tipos, validación del historial, cliente de n8n y pruebas.
+- `n8n`: instrucciones del agente y documentación de su configuración.
 
-La UI usa renderizado declarativo de React. El historial se valida antes de cargarlo y migra los mensajes de la versión anterior. Las peticiones se cancelan al eliminar una conversación o desmontar el chat y tienen un límite de 60 segundos. Los errores permiten reintentar sin duplicar el mensaje del usuario.
+## Limitaciones
 
-## Conexión con n8n
-
-Copia `.env.example` a `.env.local` y define:
-
-```dotenv
-NEXT_PUBLIC_N8N_WEBHOOK_URL=https://ia-proyecto.app.n8n.cloud/webhook/harassment-chatbot
-```
-
-Reinicia el servidor de desarrollo después de cambiarla. En producción debes configurarla antes de compilar. La URL es pública y no debe contener credenciales privadas. La configuración antigua de localStorage ya no se usa.
-
-El frontend hace POST directamente al webhook con este contrato:
-
-```json
-{
-  "message": "Hola",
-  "sessionId": "uuid-de-la-conversacion",
-  "history": [{ "role": "user", "content": "Hola" }]
-}
-```
-
-Usa `sessionId` para la memoria del agente. Devuelve la respuesta en la misma solicitud con **Respond to Webhook**, por ejemplo:
-
-```json
-{
-  "reply": "Hola, ¿en qué puedo ayudarte?",
-  "sessionId": "uuid-de-la-conversacion"
-}
-```
-
-El contrato corresponde al workflow **Harassment RAG Chatbot (Work & School)**: `Website Chat Endpoint` recibe `body.message`, `Conversation Memory` usa `body.sessionId` y `Send Answer to Website` devuelve `reply` y `sessionId`. Una respuesta con otro identificador de sesión se rechaza para evitar mezclar conversaciones. El campo `history` se envía como información adicional; el workflow actual usa su nodo de memoria y no lo lee.
-
-También se aceptan los campos `output`, `text`, `message`, `response`, texto plano o un array con el objeto en la primera posición. Habilita CORS para el origen del sitio y las solicitudes OPTIONS/POST con Content-Type JSON. Publica el flujo para usar el webhook de producción. La URL `/webhook-test/` solo funciona mientras n8n escucha un evento de prueba.
-
-Sin URL configurada se muestra un error recuperable al enviar; no se generan respuestas simuladas. Los mensajes permanecen en este navegador. No hay backend propio ni receptor de callbacks asíncronos.
-
-## Historial
-
-Los mensajes se guardan automáticamente en localStorage (`alba.chats`), junto con la conversación abierta (`alba.active-conversation`). Al recargar o volver a abrir el sitio en el mismo navegador y origen, se restaura el historial y la sesión seleccionada. Reabrir una conversación conserva el `sessionId` que recibe n8n. El botón de descarga junto al contador permite guardar una copia JSON. Borrar los datos del navegador elimina la copia local; no hay sincronización entre dispositivos.
-
-La memoria Simple Memory del workflow conserva contexto en el proceso de n8n; no sustituye este historial ni una base de datos duradera. El vector store de documentos también está en memoria. Si reinicias la instancia, no debes asumir que n8n conservará ese contexto o los documentos cargados. Carga los documentos desde `Upload Knowledge Documents` para que el agente tenga fuentes que consultar y verifica que ambos nodos Gemini tengan sus credenciales configuradas.
-
-## Validación
-
-```sh
-npm run typecheck
-npm run lint
-npm test
-npm run build
-```
-
-Las pruebas cubren formatos de respuesta de n8n, aislamiento de sesiones, contrato HTTP con un servidor simulado, respuestas de error, datos corruptos, migración y restauración del historial. Para formatear: `npx prettier --write .`.
+- El historial vive solo en el navegador; no se sincroniza entre dispositivos.
+- Las instrucciones de seguridad del agente son guías para el modelo. No sustituyen la evaluación de un profesional ni garantizan detectar todas las situaciones de riesgo.
+- Si no hay un webhook de n8n configurado, la aplicación muestra un error en lugar de inventar respuestas.
