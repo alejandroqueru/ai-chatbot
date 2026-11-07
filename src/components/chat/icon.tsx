@@ -1,6 +1,7 @@
 import type { SVGProps } from 'react';
 
 const paths = {
+  asterisk: 'M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07 19.07 4.93',
   download: 'M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4',
   plus: 'M12 5v14M5 12h14',
   chat: 'M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-2 2V11.5A8.5 8.5 0 0 1 10.5 3h2A8.5 8.5 0 0 1 21 11.5Z',
@@ -36,5 +37,20 @@ export function Icon({
     >
       <path d={paths[name]} />
     </svg>
+  );
+}
+
+/** Vector brand mark: avoids platform-dependent Unicode emoji rendering. */
+export function AlbaMark(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon
+      name="asterisk"
+      width="1em"
+      height="1em"
+      strokeWidth="0.85"
+      strokeLinecap="butt"
+      className="alba-mark"
+      {...props}
+    />
   );
 }

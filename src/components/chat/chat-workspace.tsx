@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useChat } from '@/hooks/use-chat';
 import { serializeHistory } from '@/lib/chat-storage';
 import { Composer } from './composer';
-import { Icon } from './icon';
+import { AlbaMark, Icon } from './icon';
 import { MessageList } from './message-list';
 import { Sidebar } from './sidebar';
 import { Welcome } from './welcome';
@@ -130,7 +130,7 @@ export function ChatWorkspace() {
             <span>
               a tu ritmo, con alba{' '}
               <span className="footer-star" aria-hidden="true">
-                ✳
+                <AlbaMark />
               </span>
             </span>
           </footer>

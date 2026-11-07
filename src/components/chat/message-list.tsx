@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import Markdown from 'react-markdown';
 import type { Message } from '@/lib/chat-types';
+import { AlbaMark } from './icon';
 
 interface MessageListProps {
   messages: Message[];
@@ -30,7 +31,7 @@ export function MessageList({
       {messages.map((message) => (
         <article key={message.id} className={`message ${message.role}`}>
           <div className="message-avatar" aria-hidden="true">
-            {message.role === 'user' ? 'T' : '✳'}
+            {message.role === 'user' ? 'T' : <AlbaMark />}
           </div>
           <div className="message-body">
             <div className="message-author">
@@ -64,7 +65,7 @@ export function MessageList({
       {pending && (
         <div className="message assistant">
           <div className="message-avatar" aria-hidden="true">
-            ✳
+            <AlbaMark />
           </div>
           <div
             className="typing"

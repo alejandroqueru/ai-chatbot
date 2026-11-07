@@ -91,6 +91,11 @@ a:focus-visible {
   line-height: 1;
   color: #69764f;
 }
+.alba-mark {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: -0.12em;
+}
 .brand-dot {
   color: #8b956e;
 }

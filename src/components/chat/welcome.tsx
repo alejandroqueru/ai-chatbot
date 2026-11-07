@@ -1,4 +1,4 @@
-import { Icon, type IconName } from './icon';
+import { AlbaMark, Icon, type IconName } from './icon';
 
 const suggestions: { icon: IconName; label: string; prompt: string }[] = [
   {
@@ -25,7 +25,7 @@ export function Welcome({ onPrompt }: { onPrompt: (prompt: string) => void }) {
   return (
     <section className="welcome">
       <div className="hero-symbol" aria-hidden="true">
-        ✳
+        <AlbaMark />
       </div>
       <h1>
         No tienes que afrontarlo

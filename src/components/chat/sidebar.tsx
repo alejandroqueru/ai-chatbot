@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Conversation } from '@/lib/chat-types';
-import { Icon } from './icon';
+import { AlbaMark, Icon } from './icon';
 
 interface SidebarProps {
   conversations: Conversation[];
@@ -36,7 +36,7 @@ export function Sidebar({
     >
       <div className="brand">
         <span className="brand-mark" aria-hidden="true">
-          ✳
+          <AlbaMark />
         </span>
         <span>
           alba<span className="brand-dot">.</span>
