@@ -41,7 +41,7 @@ export function Icon({
 }
 
 /** Vector brand mark: avoids platform-dependent Unicode emoji rendering. */
-export function AlbaMark(props: SVGProps<SVGSVGElement>) {
+export function AlbaMark(props: Omit<SVGProps<SVGSVGElement>, 'name'>) {
   return (
     <Icon
       name="asterisk"
