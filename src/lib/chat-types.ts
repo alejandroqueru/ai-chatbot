@@ -1,6 +1,8 @@
+export type MessageRole = 'user' | 'assistant';
+
 export interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: MessageRole;
   content: string;
   demo?: boolean;
 }

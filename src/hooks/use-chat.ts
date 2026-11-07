@@ -9,136 +9,68 @@ import {
 } from '@/lib/chat-storage';
 import { requestReply } from '@/lib/n8n-client';
 import type { Conversation, Message } from '@/lib/chat-types';
+import { chatReducer, initialChatState } from './chat-reducer';
 
-interface ChatState {
-  conversations: Conversation[];
-  activeId: string | null;
-  ready: boolean;
-  pending: string[];
-  errors: Record<string, string>;
-  storageError: string | null;
-}
+const REQUEST_TIMEOUT_MS = 60_000;
+const TITLE_MAX_LENGTH = 42;
 
-type Action =
-  | {
-      type: 'hydrate';
-      conversations: Conversation[];
-      activeId?: string | null;
-      error?: string;
-    }
-  | { type: 'select'; id: string | null }
-  | { type: 'delete'; id: string }
-  | { type: 'send'; conversation: Conversation }
-  | { type: 'reply'; id: string; message: Message }
-  | { type: 'error'; id: string; error: string }
-  | { type: 'settled'; id: string }
-  | { type: 'storage-error' };
+const HISTORY_RECOVERY_ERROR =
+  'No se pudo recuperar el historial de este navegador.';
+const TIMEOUT_ERROR =
+  'La respuesta tardó demasiado. Puedes volver a intentarlo.';
+const CONNECTION_ERROR =
+  'No pudimos conectar con el asistente. Revisa tu conexión e inténtalo de nuevo.';
 
-const initialState: ChatState = {
-  conversations: [],
-  activeId: null,
-  ready: false,
-  pending: [],
-  errors: {},
-  storageError: null,
+const createMessage = (role: Message['role'], content: string): Message => ({
+  id: crypto.randomUUID(),
+  role,
+  content,
+});
+
+const createConversation = (firstMessage: string): Conversation => ({
+  id: crypto.randomUUID(),
+  title: firstMessage.slice(0, TITLE_MAX_LENGTH),
+  createdAt: new Date().toISOString(),
+  messages: [],
+});
+
+const isTimeout = (signal: AbortSignal) =>
+  signal.aborted && signal.reason?.name === 'TimeoutError';
+
+const shouldReportError = (signal: AbortSignal) =>
+  !signal.aborted || isTimeout(signal);
+
+const toErrorMessage = (error: unknown, signal: AbortSignal) => {
+  if (signal.aborted) return TIMEOUT_ERROR;
+
+  if (error instanceof Error && !(error instanceof TypeError)) {
+    return error.message;
+  }
+
+  return CONNECTION_ERROR;
 };
 
-function reducer(state: ChatState, action: Action): ChatState {
-  switch (action.type) {
-    case 'hydrate':
-      return {
-        ...state,
-        ready: true,
-        conversations: action.conversations,
-        errors: Object.fromEntries(
-          action.conversations
-            .filter((c) => c.messages.at(-1)?.role === 'user')
-            .map((c) => [
-              c.id,
-              'Este mensaje quedó sin respuesta. Puedes volver a intentarlo.',
-            ]),
-        ),
-        activeId: action.conversations.some((c) => c.id === action.activeId)
-          ? (action.activeId ?? null)
-          : null,
-        storageError: action.error ?? null,
-      };
-    case 'select':
-      return { ...state, activeId: action.id };
-    case 'delete': {
-      const errors = { ...state.errors };
-      delete errors[action.id];
-      return {
-        ...state,
-        conversations: state.conversations.filter((c) => c.id !== action.id),
-        activeId: state.activeId === action.id ? null : state.activeId,
-        errors,
-      };
-    }
-    case 'send': {
-      const errors = { ...state.errors };
-      delete errors[action.conversation.id];
-      const exists = state.conversations.some(
-        (c) => c.id === action.conversation.id,
-      );
-      return {
-        ...state,
-        activeId: action.conversation.id,
-        errors,
-        pending: [...state.pending, action.conversation.id],
-        conversations: exists
-          ? state.conversations.map((c) =>
-              c.id === action.conversation.id ? action.conversation : c,
-            )
-          : [action.conversation, ...state.conversations],
-      };
-    }
-    case 'reply':
-      return {
-        ...state,
-        conversations: state.conversations.map((c) =>
-          c.id === action.id
-            ? { ...c, messages: [...c.messages, action.message] }
-            : c,
-        ),
-      };
-    case 'error':
-      return {
-        ...state,
-        errors: { ...state.errors, [action.id]: action.error },
-      };
-    case 'settled':
-      return {
-        ...state,
-        pending: state.pending.filter((id) => id !== action.id),
-      };
-    case 'storage-error':
-      return {
-        ...state,
-        storageError:
-          'Tu navegador no permite guardar el historial. Las conversaciones se conservarán durante esta sesión.',
-      };
-  }
-}
+const readStoredHistory = () => ({
+  conversations: parseConversations(localStorage.getItem(STORAGE_KEY)),
+  activeId: localStorage.getItem(ACTIVE_CONVERSATION_KEY),
+});
 
-export function useChat() {
-  const [state, dispatch] = useReducer(reducer, initialState);
+export const useChat = () => {
+  const [state, dispatch] = useReducer(chatReducer, initialChatState);
   const controllers = useRef(new Map<string, AbortController>());
+  const { conversations, activeId, ready, pending } = state;
 
   useEffect(() => {
     try {
-      dispatch({
-        type: 'hydrate',
-        conversations: parseConversations(localStorage.getItem(STORAGE_KEY)),
-        activeId: localStorage.getItem(ACTIVE_CONVERSATION_KEY),
-      });
+      dispatch({ type: 'hydrate', ...readStoredHistory() });
     } catch {
       dispatch({
         type: 'hydrate',
         conversations: [],
-        error: 'No se pudo recuperar el historial de este navegador.',
+        error: HISTORY_RECOVERY_ERROR,
       });
     }
+
     const requests = controllers.current;
     return () => {
       requests.forEach((controller) => controller.abort());
@@ -147,94 +79,73 @@ export function useChat() {
   }, []);
 
   useEffect(() => {
-    if (!state.ready) return;
+    if (!ready) return;
     try {
-      localStorage.setItem(STORAGE_KEY, serializeHistory(state.conversations));
+      localStorage.setItem(STORAGE_KEY, serializeHistory(conversations));
     } catch {
       dispatch({ type: 'storage-error' });
     }
-  }, [state.conversations, state.ready]);
+  }, [conversations, ready]);
 
   useEffect(() => {
-    if (!state.ready) return;
+    if (!ready) return;
     try {
-      if (state.activeId)
-        localStorage.setItem(ACTIVE_CONVERSATION_KEY, state.activeId);
+      if (activeId) localStorage.setItem(ACTIVE_CONVERSATION_KEY, activeId);
       else localStorage.removeItem(ACTIVE_CONVERSATION_KEY);
     } catch {
       dispatch({ type: 'storage-error' });
     }
-  }, [state.activeId, state.ready]);
+  }, [activeId, ready]);
 
-  const active = state.conversations.find((c) => c.id === state.activeId);
+  const active = conversations.find(({ id }) => id === activeId);
 
   const send = useCallback(
     async (text: string, retry = false) => {
       const content = text.trim();
-      if (
-        !state.ready ||
-        (!content && !retry) ||
-        (state.activeId && controllers.current.has(state.activeId))
-      )
-        return;
-      const conversation: Conversation = active ?? {
-        id: crypto.randomUUID(),
-        title: content.slice(0, 42),
-        createdAt: new Date().toISOString(),
-        messages: [],
-      };
+      const isBusy = activeId !== null && controllers.current.has(activeId);
+      if (!ready || (!content && !retry) || isBusy) return;
+
+      const conversation = active ?? createConversation(content);
       const messages = retry
         ? conversation.messages
-        : [
-            ...conversation.messages,
-            { id: crypto.randomUUID(), role: 'user' as const, content },
-          ];
+        : [...conversation.messages, createMessage('user', content)];
       if (!messages.length) return;
+
+      const { id } = conversation;
       const controller = new AbortController();
-      controllers.current.set(conversation.id, controller);
+      const { signal } = controller;
+      controllers.current.set(id, controller);
       dispatch({ type: 'send', conversation: { ...conversation, messages } });
+
       const timeout = setTimeout(
         () => controller.abort(new DOMException('Timeout', 'TimeoutError')),
-        60_000,
+        REQUEST_TIMEOUT_MS,
       );
+
       try {
         const reply = await requestReply({
-          conversationId: conversation.id,
+          conversationId: id,
           messages,
-          signal: controller.signal,
+          signal,
         });
-        if (!controller.signal.aborted)
+        if (!signal.aborted) {
           dispatch({
             type: 'reply',
-            id: conversation.id,
-            message: {
-              id: crypto.randomUUID(),
-              role: 'assistant',
-              content: reply,
-            },
+            id,
+            message: createMessage('assistant', reply),
           });
+        }
       } catch (error) {
-        if (
-          !controller.signal.aborted ||
-          controller.signal.reason?.name === 'TimeoutError'
-        ) {
-          dispatch({
-            type: 'error',
-            id: conversation.id,
-            error: controller.signal.aborted
-              ? 'La respuesta tardó demasiado. Puedes volver a intentarlo.'
-              : error instanceof Error && !(error instanceof TypeError)
-                ? error.message
-                : 'No pudimos conectar con el asistente. Revisa tu conexión e inténtalo de nuevo.',
-          });
+        if (shouldReportError(signal)) {
+          dispatch({ type: 'error', id, error: toErrorMessage(error, signal) });
         }
       } finally {
         clearTimeout(timeout);
-        controllers.current.delete(conversation.id);
-        dispatch({ type: 'settled', id: conversation.id });
+        controllers.current.delete(id);
+        dispatch({ type: 'settled', id });
       }
     },
-    [active, state.activeId, state.ready],
+    [active, activeId, ready],
   );
 
   const remove = useCallback((id: string) => {
@@ -253,7 +164,6 @@ export function useChat() {
     send,
     remove,
     select,
-    isPending:
-      state.activeId !== null && state.pending.includes(state.activeId),
+    isPending: activeId !== null && pending.includes(activeId),
   };
-}
+};
